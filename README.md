@@ -170,6 +170,8 @@ That command also refreshes the bundled `yt-dlp` binary used for YouTube playbac
 
 This repo includes a GitHub Actions workflow that deploys the bot to `/opt/lizzo` on pushes to `main`. The deploy keeps secrets and playback history out of git, writes the production `.env` from GitHub Secrets, installs dependencies on the VPS, registers slash commands, and restarts `lizzo-bot.service`.
 
+You can also run the same deploy manually from GitHub Actions by opening **Deploy to VPS** and choosing **Run workflow**.
+
 ### One-Time VPS Setup
 
 Install Node.js `>=24.14.1`, npm, rsync, and systemd support on the VPS. Then create the dedicated deploy/runtime user and app directory:

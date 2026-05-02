@@ -36,15 +36,37 @@ jobs:
       - name: Run syntax checks
         run: npm run check
 
+      - name: Validate deploy configuration
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_SSH_KEY PRODUCTION_ENV; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is missing or empty"
+              exit 1
+            fi
+          done
+
       - name: Configure SSH
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.ssh"
-          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/lizzo_deploy_key"
+          printf '%s' "$VPS_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/lizzo_deploy_key"
+          printf '\n' >> "$HOME/.ssh/lizzo_deploy_key"
           chmod 700 "$HOME/.ssh"
           chmod 600 "$HOME/.ssh/lizzo_deploy_key"
+          ssh-keygen -y -f "$HOME/.ssh/lizzo_deploy_key" > /dev/null
+
+      - name: Test SSH connection
+        run: |
+          set -euo pipefail
+          SSH_ARGS=(-i "$HOME/.ssh/lizzo_deploy_key" -p "${VPS_PORT:-22}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
+          ssh "${SSH_ARGS[@]}" "$VPS_USER@$VPS_HOST" \
+            "set -euo pipefail; test \"\$(whoami)\" = \"$VPS_USER\"; test -w /opt/lizzo; command -v node; command -v npm; command -v rsync"
 
       - name: Sync project to VPS
         run: |
