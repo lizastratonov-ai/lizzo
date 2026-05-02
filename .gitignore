@@ -4,6 +4,8 @@ node_modules/
 !.env.example
 npm-debug.log*
 data/
+youtube-cookies.txt
+*.cookies.txt
 GITHUB_ACTIONS_KEY*
 *.pem
 *.key

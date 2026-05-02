@@ -37,11 +37,23 @@ function resolveYtDlpBinary() {
   return process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 }
 
-function buildCacheKey(input, options) {
+function resolveYtDlpCookiesPath() {
+  const explicitPath = process.env.YTDLP_COOKIES_PATH?.trim() || process.env.YOUTUBE_COOKIES_PATH?.trim();
+  const cookiesPath = explicitPath || path.resolve(process.cwd(), "youtube-cookies.txt");
+
+  if (cookiesPath && fs.existsSync(cookiesPath)) {
+    return cookiesPath;
+  }
+
+  return null;
+}
+
+function buildCacheKey(input, options, cookiesPath) {
   return JSON.stringify([
     input,
     options.defaultSearch || "",
     options.format || "",
+    cookiesPath || "",
   ]);
 }
 
@@ -139,7 +151,8 @@ function runYtDlp(args) {
 }
 
 async function getInfo(input, options = {}) {
-  const cacheKey = buildCacheKey(input, options);
+  const cookiesPath = resolveYtDlpCookiesPath();
+  const cacheKey = buildCacheKey(input, options, cookiesPath);
   const now = Date.now();
   const cachedEntry = infoCache.get(cacheKey);
 
@@ -174,6 +187,10 @@ async function getInfo(input, options = {}) {
     args.push("--format", options.format);
   }
 
+  if (cookiesPath) {
+    args.push("--cookies", cookiesPath);
+  }
+
   const pendingLookup = runYtDlp(args)
     .then((info) => {
       const ttlMs = getCacheTtlMs(info, options);
@@ -205,5 +222,6 @@ async function getInfo(input, options = {}) {
 module.exports = {
   getInfo,
   isYouTubeUrl,
+  resolveYtDlpCookiesPath,
   resolveYtDlpBinary,
 };

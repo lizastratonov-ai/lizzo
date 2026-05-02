@@ -225,10 +225,17 @@ Add these repository secrets before running the workflow:
 - `VPS_PORT`: SSH port, usually `22`.
 - `VPS_SSH_KEY`: private SSH key for GitHub Actions.
 - `PRODUCTION_ENV`: full production `.env` contents, including `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, and any optional Spotify or SoundCloud values.
+- `YOUTUBE_COOKIES`: optional Netscape-format YouTube cookies file contents for `yt-dlp`.
 
 The workflow always deploys as the `lizzo` Linux user. If the SSH key is only authorized for `root` during the first run, the workflow will use that root access once to add the same public key to `/home/lizzo/.ssh/authorized_keys`, then continue as `lizzo`.
 
 The workflow accepts the remote SSH host key automatically, so no `known_hosts` secret is required.
+
+### YouTube Cookies
+
+Some VPS IP addresses get challenged by YouTube with "Sign in to confirm you're not a bot." If that happens, export YouTube cookies from a browser session in Netscape `cookies.txt` format and paste the full file contents into the `YOUTUBE_COOKIES` GitHub secret. On deploy, the workflow writes those cookies to `/opt/lizzo/youtube-cookies.txt` with mode `600`, and the bot automatically passes that file to `yt-dlp`.
+
+For local testing, place a `youtube-cookies.txt` file in the project folder or set `YTDLP_COOKIES_PATH` in `.env` to the cookies file path.
 
 ### Deploy Flow
 
@@ -236,8 +243,9 @@ On every push to `main`, `.github/workflows/deploy.yml`:
 
 - Runs `npm ci` and `npm run check` on GitHub.
 - Rsyncs the repo to `/opt/lizzo/` with `--delete`.
-- Excludes `.git/`, `node_modules/`, `.env`, `.env.*`, and `data/`.
+- Excludes `.git/`, `node_modules/`, `.env`, `.env.*`, `youtube-cookies.txt`, `*.cookies.txt`, and `data/`.
 - Writes `PRODUCTION_ENV` to `/opt/lizzo/.env` with mode `600`.
+- Writes `YOUTUBE_COOKIES` to `/opt/lizzo/youtube-cookies.txt` with mode `600` when that secret is set.
 - Ensures `/opt/lizzo/data` exists so `play-history.sqlite` survives deploys.
 - Runs `npm ci --omit=dev`, `npm run deploy-commands`, and restarts `lizzo-bot.service`.
 
