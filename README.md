@@ -223,14 +223,9 @@ Add these repository secrets before running the workflow:
 - `VPS_PORT`: SSH port, usually `22`.
 - `VPS_USER`: `lizzo`.
 - `VPS_SSH_KEY`: private SSH key for GitHub Actions.
-- `VPS_KNOWN_HOSTS`: trusted known_hosts entry for the VPS.
 - `PRODUCTION_ENV`: full production `.env` contents, including `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, and any optional Spotify or SoundCloud values.
 
-You can create the known_hosts value from your computer with:
-
-```bash
-ssh-keyscan -p 22 your-vps-hostname-or-ip
-```
+The workflow accepts the remote SSH host key automatically, so no `known_hosts` secret is required.
 
 ### Deploy Flow
 
