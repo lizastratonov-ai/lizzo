@@ -4,3 +4,6 @@ node_modules/
 !.env.example
 npm-debug.log*
 data/
+GITHUB_ACTIONS_KEY*
+*.pem
+*.key

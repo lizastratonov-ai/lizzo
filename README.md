@@ -165,3 +165,87 @@ Music-source sites change over time. If playback breaks later, update dependenci
 ```
 
 That command also refreshes the bundled `yt-dlp` binary used for YouTube playback.
+
+## Deploy To An Ubuntu VPS
+
+This repo includes a GitHub Actions workflow that deploys the bot to `/opt/lizzo` on pushes to `main`. The deploy keeps secrets and playback history out of git, writes the production `.env` from GitHub Secrets, installs dependencies on the VPS, registers slash commands, and restarts `lizzo-bot.service`.
+
+### One-Time VPS Setup
+
+Install Node.js `>=24.14.1`, npm, rsync, and systemd support on the VPS. Then create the dedicated deploy/runtime user and app directory:
+
+```bash
+sudo useradd --system --create-home --shell /bin/bash --user-group lizzo
+sudo mkdir -p /opt/lizzo
+sudo chown -R lizzo:lizzo /opt/lizzo
+```
+
+Generate an SSH key for GitHub Actions, then add its public key to the VPS:
+
+```bash
+sudo install -d -m 700 -o lizzo -g lizzo /home/lizzo/.ssh
+echo "PASTE_GITHUB_ACTIONS_PUBLIC_KEY_HERE" | sudo tee -a /home/lizzo/.ssh/authorized_keys
+sudo chown lizzo:lizzo /home/lizzo/.ssh/authorized_keys
+sudo chmod 600 /home/lizzo/.ssh/authorized_keys
+```
+
+From this project on your computer, copy the service file to the VPS:
+
+```bash
+scp -P 22 deploy/lizzo-bot.service your-admin-user@your-vps-host:/tmp/lizzo-bot.service
+```
+
+Then install it on the VPS:
+
+```bash
+sudo install -m 644 /tmp/lizzo-bot.service /etc/systemd/system/lizzo-bot.service
+sudo systemctl daemon-reload
+sudo systemctl enable lizzo-bot.service
+```
+
+Allow the `lizzo` user to restart and check only this service from GitHub Actions:
+
+```bash
+sudo visudo -f /etc/sudoers.d/lizzo-bot
+```
+
+Add this line:
+
+```sudoers
+lizzo ALL=(root) NOPASSWD: /usr/bin/systemctl restart lizzo-bot.service, /usr/bin/systemctl is-active --quiet lizzo-bot.service, /usr/bin/systemctl status lizzo-bot.service
+```
+
+### GitHub Secrets
+
+Add these repository secrets before running the workflow:
+
+- `VPS_HOST`: VPS hostname or IP address.
+- `VPS_PORT`: SSH port, usually `22`.
+- `VPS_USER`: `lizzo`.
+- `VPS_SSH_KEY`: private SSH key for GitHub Actions.
+- `VPS_KNOWN_HOSTS`: trusted known_hosts entry for the VPS.
+- `PRODUCTION_ENV`: full production `.env` contents, including `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, and any optional Spotify or SoundCloud values.
+
+You can create the known_hosts value from your computer with:
+
+```bash
+ssh-keyscan -p 22 your-vps-hostname-or-ip
+```
+
+### Deploy Flow
+
+On every push to `main`, `.github/workflows/deploy.yml`:
+
+- Runs `npm ci` and `npm run check` on GitHub.
+- Rsyncs the repo to `/opt/lizzo/` with `--delete`.
+- Excludes `.git/`, `node_modules/`, `.env`, `.env.*`, and `data/`.
+- Writes `PRODUCTION_ENV` to `/opt/lizzo/.env` with mode `600`.
+- Ensures `/opt/lizzo/data` exists so `play-history.sqlite` survives deploys.
+- Runs `npm ci --omit=dev`, `npm run deploy-commands`, and restarts `lizzo-bot.service`.
+
+Check the service after a deploy with:
+
+```bash
+sudo systemctl status lizzo-bot.service
+sudo journalctl -u lizzo-bot.service -n 50 --no-pager
+```

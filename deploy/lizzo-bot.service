@@ -1,0 +1,17 @@
+[Unit]
+Description=Lizzo Discord Music Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lizzo
+Group=lizzo
+WorkingDirectory=/opt/lizzo
+EnvironmentFile=/opt/lizzo/.env
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/index.js
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

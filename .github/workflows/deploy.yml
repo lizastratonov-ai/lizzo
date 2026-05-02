@@ -1,0 +1,83 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy bot
+    runs-on: ubuntu-latest
+
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run syntax checks
+        run: npm run check
+
+      - name: Configure SSH
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/lizzo_deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 700 "$HOME/.ssh"
+          chmod 600 "$HOME/.ssh/lizzo_deploy_key" "$HOME/.ssh/known_hosts"
+
+      - name: Sync project to VPS
+        run: |
+          set -euo pipefail
+          RSYNC_SSH="ssh -i $HOME/.ssh/lizzo_deploy_key -p ${VPS_PORT:-22} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          rsync -az --delete \
+            -e "$RSYNC_SSH" \
+            --include='.env.example' \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='data/' \
+            ./ "$VPS_USER@$VPS_HOST:/opt/lizzo/"
+
+      - name: Install and restart on VPS
+        env:
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+        run: |
+          set -euo pipefail
+          SSH_ARGS=(-i "$HOME/.ssh/lizzo_deploy_key" -p "${VPS_PORT:-22}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
+
+          printf '%s\n' "$PRODUCTION_ENV" | ssh "${SSH_ARGS[@]}" "$VPS_USER@$VPS_HOST" \
+            "cat > /opt/lizzo/.env && chmod 600 /opt/lizzo/.env"
+
+          ssh "${SSH_ARGS[@]}" "$VPS_USER@$VPS_HOST" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/lizzo
+          mkdir -p data
+          npm ci --omit=dev
+          npm run deploy-commands
+          sudo /usr/bin/systemctl restart lizzo-bot.service
+          sudo /usr/bin/systemctl is-active --quiet lizzo-bot.service
+          REMOTE
