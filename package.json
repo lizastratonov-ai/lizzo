@@ -1,0 +1,32 @@
+{
+  "name": "private-discord-music-bot",
+  "version": "1.0.0",
+  "description": "A private Discord music bot for one server, built with discord.js and DisTube.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "deploy-commands": "node src/deploy-commands.js",
+    "check": "node --check src/index.js && node --check src/deploy-commands.js"
+  },
+  "engines": {
+    "node": ">=24.14.1"
+  },
+  "keywords": [
+    "discord",
+    "music-bot",
+    "distube"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "@distube/soundcloud": "^2.0.4",
+    "@distube/spotify": "^2.0.2",
+    "@distube/yt-dlp": "^2.0.1",
+    "discord.js": "^14.26.0",
+    "distube": "^5.2.3",
+    "dotenv": "^17.4.0",
+    "ffmpeg-static": "^5.3.0",
+    "opusscript": "^0.1.1"
+  }
+}

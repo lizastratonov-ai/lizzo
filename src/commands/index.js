@@ -1,0 +1,16 @@
+module.exports = [
+  require("./play"),
+  require("./player"),
+  require("./history"),
+  require("./queue"),
+  require("./nowplaying"),
+  require("./pause"),
+  require("./resume"),
+  require("./skip"),
+  require("./stop"),
+  require("./leave"),
+  require("./seek"),
+  require("./shuffle"),
+  require("./remove"),
+  require("./clear"),
+];
