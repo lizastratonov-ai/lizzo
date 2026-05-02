@@ -18,7 +18,7 @@ jobs:
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
       VPS_PORT: ${{ secrets.VPS_PORT }}
-      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_USER: lizzo
 
     steps:
       - name: Check out repository
@@ -59,14 +59,34 @@ jobs:
           printf '\n' >> "$HOME/.ssh/lizzo_deploy_key"
           chmod 700 "$HOME/.ssh"
           chmod 600 "$HOME/.ssh/lizzo_deploy_key"
-          ssh-keygen -y -f "$HOME/.ssh/lizzo_deploy_key" > /dev/null
+          ssh-keygen -y -f "$HOME/.ssh/lizzo_deploy_key" > "$HOME/.ssh/lizzo_deploy_key.pub"
 
       - name: Test SSH connection
         run: |
           set -euo pipefail
           SSH_ARGS=(-i "$HOME/.ssh/lizzo_deploy_key" -p "${VPS_PORT:-22}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
-          ssh "${SSH_ARGS[@]}" "$VPS_USER@$VPS_HOST" \
-            "set -euo pipefail; test \"\$(whoami)\" = \"$VPS_USER\"; test -w /opt/lizzo; command -v node; command -v npm; command -v rsync"
+
+          smoke_test() {
+            ssh "${SSH_ARGS[@]}" "$VPS_USER@$VPS_HOST" \
+              "set -euo pipefail; test \"\$(whoami)\" = \"$VPS_USER\"; test -w /opt/lizzo; command -v node; command -v npm; command -v rsync"
+          }
+
+          if ! smoke_test; then
+            echo "Deploy user SSH failed; attempting one-time root bootstrap."
+            PUBLIC_KEY_B64="$(base64 < "$HOME/.ssh/lizzo_deploy_key.pub" | tr -d '\n')"
+            ssh "${SSH_ARGS[@]}" "root@$VPS_HOST" "PUBLIC_KEY_B64='$PUBLIC_KEY_B64' bash -s" <<'REMOTE'
+          set -euo pipefail
+          install -d -m 700 -o lizzo -g lizzo /home/lizzo/.ssh
+          touch /home/lizzo/.ssh/authorized_keys
+          key="$(printf '%s' "$PUBLIC_KEY_B64" | base64 -d | tr -d '\r')"
+          if [ -n "$key" ] && ! grep -qxF "$key" /home/lizzo/.ssh/authorized_keys; then
+            printf '%s\n' "$key" >> /home/lizzo/.ssh/authorized_keys
+          fi
+          chown lizzo:lizzo /home/lizzo/.ssh/authorized_keys
+          chmod 600 /home/lizzo/.ssh/authorized_keys
+          REMOTE
+            smoke_test
+          fi
 
       - name: Sync project to VPS
         run: |

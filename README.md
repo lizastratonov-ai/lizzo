@@ -223,9 +223,10 @@ Add these repository secrets before running the workflow:
 
 - `VPS_HOST`: VPS hostname or IP address.
 - `VPS_PORT`: SSH port, usually `22`.
-- `VPS_USER`: `lizzo`.
 - `VPS_SSH_KEY`: private SSH key for GitHub Actions.
 - `PRODUCTION_ENV`: full production `.env` contents, including `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, and any optional Spotify or SoundCloud values.
+
+The workflow always deploys as the `lizzo` Linux user. If the SSH key is only authorized for `root` during the first run, the workflow will use that root access once to add the same public key to `/home/lizzo/.ssh/authorized_keys`, then continue as `lizzo`.
 
 The workflow accepts the remote SSH host key automatically, so no `known_hosts` secret is required.
 
