@@ -107,7 +107,6 @@ jobs:
       - name: Install and restart on VPS
         env:
           PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
-          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
         run: |
           set -euo pipefail
           SSH_ARGS=(-i "$HOME/.ssh/lizzo_deploy_key" -p "${VPS_PORT:-22}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
@@ -115,20 +114,10 @@ jobs:
           printf '%s\n' "$PRODUCTION_ENV" | ssh "${SSH_ARGS[@]}" "$VPS_USER@$VPS_HOST" \
             "cat > /opt/lizzo/.env && chmod 600 /opt/lizzo/.env"
 
-          if [ -n "${YOUTUBE_COOKIES:-}" ]; then
-            printf '%s\n' "$YOUTUBE_COOKIES" | tr -d '\r' | ssh "${SSH_ARGS[@]}" "$VPS_USER@$VPS_HOST" \
-              "cat > /opt/lizzo/youtube-cookies.txt && chmod 600 /opt/lizzo/youtube-cookies.txt"
-          else
-            echo "YOUTUBE_COOKIES is not set; leaving any existing /opt/lizzo/youtube-cookies.txt unchanged."
-          fi
-
           ssh "${SSH_ARGS[@]}" "$VPS_USER@$VPS_HOST" <<'REMOTE'
           set -euo pipefail
           cd /opt/lizzo
           mkdir -p data
-          if [ -f youtube-cookies.txt ]; then
-            chmod 600 youtube-cookies.txt
-          fi
           npm ci --omit=dev
           npm run deploy-commands
           sudo /usr/bin/systemctl restart lizzo-bot.service

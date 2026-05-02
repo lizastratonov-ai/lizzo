@@ -225,7 +225,6 @@ Add these repository secrets before running the workflow:
 - `VPS_PORT`: SSH port, usually `22`.
 - `VPS_SSH_KEY`: private SSH key for GitHub Actions.
 - `PRODUCTION_ENV`: full production `.env` contents, including `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, and any optional Spotify or SoundCloud values.
-- `YOUTUBE_COOKIES`: optional Netscape-format YouTube cookies file contents for `yt-dlp`.
 
 The workflow always deploys as the `lizzo` Linux user. If the SSH key is only authorized for `root` during the first run, the workflow will use that root access once to add the same public key to `/home/lizzo/.ssh/authorized_keys`, then continue as `lizzo`.
 
@@ -233,7 +232,31 @@ The workflow accepts the remote SSH host key automatically, so no `known_hosts` 
 
 ### YouTube Cookies
 
-Some VPS IP addresses get challenged by YouTube with "Sign in to confirm you're not a bot." If that happens, export YouTube cookies from a browser session in Netscape `cookies.txt` format and paste the full file contents into the `YOUTUBE_COOKIES` GitHub secret. On deploy, the workflow writes those cookies to `/opt/lizzo/youtube-cookies.txt` with mode `600`, and the bot automatically passes that file to `yt-dlp`.
+Some VPS IP addresses get challenged by YouTube with "Sign in to confirm you're not a bot." If that happens, run the local upload script from this project folder:
+
+```powershell
+.\scripts\Upload-YouTubeCookies.ps1
+```
+
+The script uses the bundled `yt-dlp` binary to export Netscape-format cookies from Google Chrome, uploads them to `/opt/lizzo/youtube-cookies.txt`, sets mode `600`, restarts `lizzo-bot.service`, and deletes the temporary local export. The GitHub Actions deploy excludes `youtube-cookies.txt` so future deploys preserve the file on the VPS without storing cookies in GitHub Secrets or git.
+
+If Chrome is open, close it first or run:
+
+```powershell
+.\scripts\Upload-YouTubeCookies.ps1 -CloseBrowser
+```
+
+Newer Chrome and Edge builds on Windows may block direct cookie decryption with App-Bound Encryption. In that case, export YouTube cookies in Netscape `cookies.txt` format and upload that file with:
+
+```powershell
+.\scripts\Upload-YouTubeCookies.ps1 -CookiesPath C:\path\to\cookies.txt
+```
+
+You can also use another supported browser, for example:
+
+```powershell
+.\scripts\Upload-YouTubeCookies.ps1 -Browser firefox
+```
 
 For local testing, place a `youtube-cookies.txt` file in the project folder or set `YTDLP_COOKIES_PATH` in `.env` to the cookies file path.
 
@@ -245,7 +268,6 @@ On every push to `main`, `.github/workflows/deploy.yml`:
 - Rsyncs the repo to `/opt/lizzo/` with `--delete`.
 - Excludes `.git/`, `node_modules/`, `.env`, `.env.*`, `youtube-cookies.txt`, `*.cookies.txt`, and `data/`.
 - Writes `PRODUCTION_ENV` to `/opt/lizzo/.env` with mode `600`.
-- Writes `YOUTUBE_COOKIES` to `/opt/lizzo/youtube-cookies.txt` with mode `600` when that secret is set.
 - Ensures `/opt/lizzo/data` exists so `play-history.sqlite` survives deploys.
 - Runs `npm ci --omit=dev`, `npm run deploy-commands`, and restarts `lizzo-bot.service`.
 
